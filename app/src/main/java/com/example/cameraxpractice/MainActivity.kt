@@ -1,16 +1,22 @@
 package com.example.cameraxpractice
 
 import android.Manifest
+import android.annotation.SuppressLint
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
+import android.util.Rational
+import android.view.Surface
+import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.cameraxpractice.R.string.app_name
@@ -99,10 +105,19 @@ class MainActivity : AppCompatActivity() {
                 val msg = "Photo capture succeeded: $savedUri"
                 Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
                 Log.d(TAG, msg)
+                goToViewEdit(savedUri)
             }
         })
     }
 
+    private fun goToViewEdit(savedUri: Uri) {
+        val intent = Intent(this, PictureViewActivity::class.java).apply {
+            putExtra("imageUri", savedUri.toString())
+        }
+        startActivity(intent)
+    }
+
+    @SuppressLint("UnsafeExperimentalUsageError")
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
@@ -116,6 +131,7 @@ class MainActivity : AppCompatActivity() {
                     .also {
                         it.setSurfaceProvider(viewFinder.createSurfaceProvider())
                     }
+
             imageCapture = ImageCapture.Builder()
                     .build()
 
@@ -123,16 +139,33 @@ class MainActivity : AppCompatActivity() {
                     .build()
                     .also {
                         it.setAnalyzer(cameraExecutor, LuminosityAnalyzer { luma ->
-//                            Log.d(TAG, "Average luminosity: $luma")
+                            Log.d(TAG, "Average luminosity: $luma")
+                            val previewView = findViewById<PreviewView>(R.id.viewFinder)
                         })
                     }
+
+//            val previewView = findViewById<PreviewView>(R.id.viewFinder)
+//            val thisView = findViewById<PreviewView>(R.id.viewFinder)
 
             // Select back camera as a default
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
+            // testing view port
+            val viewPort = ViewPort.Builder(Rational(350,350), Surface.ROTATION_0)
+                .build()
+
+            val useCaseGroup = UseCaseGroup.Builder()
+                .addUseCase(preview)
+                .addUseCase(imageAnalyzer)
+                .addUseCase(imageCapture!!)
+                .setViewPort(viewPort)
+                .build()
+
             try {
                 // Unbind use cases before rebinding
                 cameraProvider.unbindAll()
+
+                cameraProvider.bindToLifecycle(this, cameraSelector, useCaseGroup)
 
                 // Bind use cases to camera
                 cameraProvider.bindToLifecycle(
