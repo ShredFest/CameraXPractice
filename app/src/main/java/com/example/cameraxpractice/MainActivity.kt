@@ -1,16 +1,22 @@
 package com.example.cameraxpractice
 
 import android.Manifest
+import android.annotation.SuppressLint
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Matrix
+import android.media.Image
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
+import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.cameraxpractice.R.string.app_name
@@ -22,7 +28,7 @@ import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-typealias LumaListener = (luma: Double) -> Unit
+typealias ImageListener = (imageProxy: ImageProxy) -> Unit
 
 
 class MainActivity : AppCompatActivity() {
@@ -31,7 +37,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var outputDirectory: File
     private lateinit var cameraExecutor: ExecutorService
 
-    private class LuminosityAnalyzer(private val listener: LumaListener) : ImageAnalysis.Analyzer {
+    private class LuminosityAnalyzer(private val listener: ImageListener ) : ImageAnalysis.Analyzer {
 
         private fun ByteBuffer.toByteArray(): ByteArray {
             rewind()    // Rewind the buffer to zero
@@ -45,14 +51,16 @@ class MainActivity : AppCompatActivity() {
             val buffer = image.planes[0].buffer
             val data = buffer.toByteArray()
             val pixels = data.map { it.toInt() and 0xFF }
-            val luma = pixels.average()
+//            val luma = pixels.average()
 
-            listener(luma)
+            listener(image)
 
             image.close()
         }
     }
 
+
+//    Activity actions
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -96,15 +104,18 @@ class MainActivity : AppCompatActivity() {
 
             override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                 val savedUri = Uri.fromFile(photoFile)
-                val msg = "Photo capture succeeded: $savedUri"
+                val msg = "Please Edit"
                 Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
                 Log.d(TAG, msg)
+                goToViewEdit(savedUri)
             }
         })
     }
 
+
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+        val imgProxy: ImageProxy
 
         cameraProviderFuture.addListener(Runnable {
             // Used to bind the lifecycle of cameras to the lifecycle owner
@@ -112,20 +123,22 @@ class MainActivity : AppCompatActivity() {
 
             // Preview
             val preview = Preview.Builder()
-                    .build()
-                    .also {
-                        it.setSurfaceProvider(viewFinder.createSurfaceProvider())
-                    }
+                .build()
+                .also {
+                    it.setSurfaceProvider(viewFinder.createSurfaceProvider())
+                }
             imageCapture = ImageCapture.Builder()
-                    .build()
+                .build()
 
+//set to return matrix
             val imageAnalyzer = ImageAnalysis.Builder()
-                    .build()
-                    .also {
-                        it.setAnalyzer(cameraExecutor, LuminosityAnalyzer { luma ->
+                .build()
+                .also {
+                    it.setAnalyzer(cameraExecutor, LuminosityAnalyzer { img ->
 //                            Log.d(TAG, "Average luminosity: $luma")
-                        })
-                    }
+                        getCorrectionMatrix(img , viewFinder)
+                    })
+                }
 
             // Select back camera as a default
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
@@ -136,7 +149,8 @@ class MainActivity : AppCompatActivity() {
 
                 // Bind use cases to camera
                 cameraProvider.bindToLifecycle(
-                        this, cameraSelector, preview, imageCapture, imageAnalyzer)
+                        this, cameraSelector, preview, imageCapture, imageAnalyzer )
+
 
             } catch (exc: Exception) {
                 Log.e(TAG, "Use case binding failed", exc)
@@ -181,6 +195,63 @@ class MainActivity : AppCompatActivity() {
                         Toast.LENGTH_SHORT).show()
                 finish()
             }
+        }
+    }
+
+
+
+
+//for learning about transforms still need to learn where to pass the matrix to in order to manipulate it
+    fun getCorrectionMatrix(imageProxy: ImageProxy, previewView: PreviewView) : Matrix {
+        val cropRect = imageProxy.cropRect
+        val rotationDegrees = imageProxy.imageInfo.rotationDegrees
+        val matrix = Matrix()
+
+        // A float array of the source vertices (crop rect) in clockwise order.
+        val source = floatArrayOf(
+            cropRect.left.toFloat(),
+            cropRect.top.toFloat(),
+            cropRect.right.toFloat(),
+            cropRect.top.toFloat(),
+            cropRect.right.toFloat(),
+            cropRect.bottom.toFloat(),
+            cropRect.left.toFloat(),
+            cropRect.bottom.toFloat()
+        )
+
+        // A float array of the destination vertices in clockwise order.
+        val destination = floatArrayOf(
+            0f,
+            0f,
+            previewView.width.toFloat(),
+            0f,
+            previewView.width.toFloat(),
+            previewView.height.toFloat(),
+            0f,
+            previewView.height.toFloat()
+        )
+
+        // The destination vertexes need to be shifted based on rotation degrees. The
+        // rotation degree represents the clockwise rotation needed to correct the image.
+
+        // Each vertex is represented by 2 float numbers in the vertices array.
+        val vertexSize = 2
+        // The destination needs to be shifted 1 vertex for every 90° rotation.
+        val shiftOffset = rotationDegrees / 90 * vertexSize;
+        val tempArray = destination.clone()
+        for (toIndex in source.indices) {
+            val fromIndex = (toIndex + shiftOffset) % source.size
+            destination[toIndex] = tempArray[fromIndex]
+        }
+        matrix.setPolyToPoly(source, 0, destination, 0, 4)
+        return matrix
+    }
+
+
+    fun goToViewEdit( uri: Uri ) {
+//        pass the URI for the picture to the ViewEdit
+        val intent = Intent(this, pictureViewEdit::class.java).apply {
+            putExtra("image url", uri.toString())
         }
     }
 }
