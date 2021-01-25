@@ -13,7 +13,8 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.CameraXPractice">
-        <activity android:name=".CameraX"></activity>
+        <activity android:name=".LiveEdgeDetection"></activity>
+        <activity android:name=".CameraX" />
         <activity android:name=".PictureViewEdit" />
         <activity android:name=".MainActivity">
             <intent-filter>

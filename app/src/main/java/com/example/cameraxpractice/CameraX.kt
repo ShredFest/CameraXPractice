@@ -193,7 +193,6 @@ class CameraX : AppCompatActivity(){
 
     fun goToViewEdit( uri: Uri ) {
 //        pass the URI for the picture to the ViewEdit
-
         val intent = Intent(this, PictureViewEdit::class.java).apply {
             putExtra("image bundle", uri.toString())
         }

@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
+import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
@@ -30,6 +31,17 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+
+    }
+
+    fun goToCameraX(view: View){
+        val intent = Intent(this,CameraX::class.java)
+        startActivity(intent)
+    }
+
+    fun goToLiveED(view: View){
+        val intent = Intent(this,LiveEdgeDetection::class.java)
+        startActivity(intent)
     }
 
 
