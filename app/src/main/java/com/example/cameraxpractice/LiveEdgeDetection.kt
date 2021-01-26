@@ -5,6 +5,8 @@ import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Bundle
+import android.util.Log
+import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
 import info.hannes.liveedgedetection.ScanConstants.IMAGE_NAME
 import info.hannes.liveedgedetection.ScanConstants.SCANNED_RESULT
@@ -17,27 +19,30 @@ import java.io.File
 class LiveEdgeDetection : AppCompatActivity() {
     private var filePath: String? = null
 
+    val REQUEST_CODE = 1
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_live_edge_detection)
 
-
-        val REQUEST_CODE = 1
-
         startActivityForResult(Intent(this, ScanActivity::class.java), REQUEST_CODE)
+    }
 
-        @SuppressLint("SetTextI18n")
-        fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-            if (requestCode == REQUEST_CODE) {
-                if (resultCode == Activity.RESULT_OK) run { ->
-                    if (data != null) {
-                        filePath = data.getStringExtra(SCANNED_RESULT)
-                    }
-                }else if (resultCode == Activity.RESULT_CANCELED) {
-                    finish()
+
+    @SuppressLint("SetTextI18n")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode,resultCode,data)
+        if (requestCode == REQUEST_CODE) {
+            if (resultCode == Activity.RESULT_OK) data?.extras?.let { bundle ->
+                filePath = data.getStringExtra(SCANNED_RESULT)
+                Log.i("FILEPATH", filePath.toString())
+                filePath?.let {
+                    val baseBitmap = it.decodeBitmapFromFile()
+                    scanned_image.setImageBitmap(baseBitmap)
+                    scanned_image.scaleType = ImageView.ScaleType.FIT_CENTER
                 }
-
+            }else if (resultCode == Activity.RESULT_CANCELED) {
+                finish()
             }
         }
     }
